@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="white_stone" type="id"/>
+    <item name="black_stone" type="id"/>
+    <item name="empty_spot" type="id"/>
+</resources>
