@@ -10,6 +10,7 @@ package com.example.wills.konane;
 
 import android.util.Pair;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -27,11 +28,24 @@ public class Board {
             {"W","B","W","B","W","B"}};
     public static int NUM_BLOCKS = 6;
 
+    //stores the pair of row and value of first movable stone of each color
+    //This is done to avoid multiple repetitive calculation
+    public static Pair<Integer,Integer> FIRST_MOVABLE_BLACK;
+    public static Pair<Integer,Integer> FIRST_MOVABLE_WHITE;
+
     //constructor for Board class
     Board()
     {
         //First two stones have to be randomly removed from the board
         removeFirst();
+
+        //When an object of Board class is created, we want the value of FIRST_MOVABLE_BLACK
+        //and FIRST_MOVABLE_WHITE_ to be instantiated. Their value is updated in hasMoves function.
+        //call that function to initialized the values.
+
+        hasMoves(BLACK_STONE);
+        hasMoves(WHITE_STONE);
+
     }
 
     /*
@@ -142,20 +156,13 @@ public class Board {
         return swappable;
     }
 
-    /*This function checks if any stone of given stone_color has any moves left
+    /*This function checks if any stone of given stone_color has any moves left. If it can be moved,
+      it sets the has_moves flag to true and updates the FIRST_MOVABLE_BLACK or FIRST_MOVABLE_WHITE
+      depending on the value of the parameter;
 
-    parameter: stone_color: "W", "B" or "E" of the stone whose possible moves should be checked
+     PARAMETERS: stone_color: "W", "B" or "E" of the stone whose possible moves should be checked
 
-    for each_row in NUM_BLOCKS:
-        for each column in NUM_BLOCKS:
-            If BOARD[row][col] has stone_color:
-                if isFurther(row,col) == true:
-                    has_moves = true
-                    exit out of both loop
-
-     return hasmove
-
-
+     RETURNS: true if there are any available moves. false otherwise
      */
    public boolean hasMoves(String stone_color)
    {
@@ -168,6 +175,12 @@ public class Board {
                if (BOARD[i][j].equals(stone_color) && has_moves !=true)
                {
                    has_moves = isFurtherMove(i,j);
+
+                   if(stone_color.equals(BLACK_STONE))
+                       FIRST_MOVABLE_BLACK = new Pair <>(i,j);
+
+                   if(stone_color.equals(WHITE_STONE))
+                       FIRST_MOVABLE_WHITE = new Pair <>(i,j);
                }
            }
 
@@ -176,6 +189,7 @@ public class Board {
        }
        return has_moves;
    }
+
 
    /*this checks, if the stone in row and col and move further
     Parameters:
@@ -241,9 +255,45 @@ public class Board {
 
     }
 
-    public void getPossibleMoves(int stoneRow, int stoneCol, Pair<Integer, Integer>[] movesContainer)
+
+    public Pair getPositionNorth(int row, int col)
     {
-        //check if it's possible to move in column
+        //If it's possible to move to the right, get the coordinate to the right
+        Pair <Integer, Integer> north = new Pair <>(-1,-1);
+
+        if(col+2 < NUM_BLOCKS && BOARD[row][col+2].equals(EMPTY_SPOT) && !BOARD[row][col+1].equals(EMPTY_SPOT)) {
+            north = new Pair <>(row, col+2);
+        }
+        return north;
+    }
+
+    public Pair getPositionEast(int row, int col)
+    {
+        //If it's possible to move to the right, get the coordinate to the right
+        Pair <Integer, Integer> east = new Pair <>(-1,-1);
+
+        if(row+2 < NUM_BLOCKS && BOARD[row+2][col].equals(EMPTY_SPOT) && !BOARD[row+1][col].equals(EMPTY_SPOT)){
+            east = new Pair <>(row+2, col);
+        }
+        return east;
+    }
+
+    public Pair getPositionSouth(int row, int col)
+    {
+        Pair <Integer, Integer> south = new Pair <>(-1,-1);
+        if(col-2 >= 0 && BOARD[row][col-2].equals(EMPTY_SPOT) && !BOARD[row][col-1].equals(EMPTY_SPOT)) {
+            south = new Pair <>(row, col-2);
+        }
+        return south;
+    }
+
+    public Pair getPositionWest(int row, int col)
+    {
+        Pair <Integer, Integer> west = new Pair <>(-1,-1);
+        if(row-2 >= 0 && BOARD[row-2][col].equals(EMPTY_SPOT) && !BOARD[row-1][col].equals(EMPTY_SPOT)) {
+            west = new Pair <>(row-2, col);
+        }
+        return west;
     }
 
 

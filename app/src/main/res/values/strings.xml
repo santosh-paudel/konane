@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">konane</string>
+
+    <string-array name="Search_Algorithms">
+        <item>Breadth First Search</item>
+        <item>Best First Search</item>
+        <item>Depth First Search</item>
+    </string-array>
 </resources>

@@ -8,21 +8,24 @@
 
 package com.example.wills.konane;
 
-import android.content.Context;
+
 import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Pair;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.*;
-import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import static android.view.View.VISIBLE;
@@ -31,8 +34,26 @@ import static android.widget.Toast.makeText;
 /*This is a view class that represents Game Activity*/
 public class MainActivity extends AppCompatActivity {
 
-    Game game;
-    Button turnSkipButton;
+    public Game game;
+    public Button turnSkipButton;
+
+    //Numeric value to keep track of the number of hints asked by the user
+    public static int hintNumber = 0;
+
+    //At any given time, if the user clicks hint, only two imageview object can have blink animation.
+    //That object should be globally accessible to start and end animations from any functions.
+    ImageView sourceBlink = null;
+    ImageView destBlink = null;
+
+    //These are the search Algorithms used in the program
+    public  static String[] searchAlgorithms = {"Breadth First Search","Best First Search","Depth First Search"};
+    public static String currentSearchAlgorithm = searchAlgorithms[0];
+
+
+    //Every users (black and white) have a a set of possible moves in their turn. This hashmap keeps track of their possible moves
+    //public static HashMap<Pair<Integer,Integer>, ArrayList<Pair<Integer,Integer>>> possibleMoves = new HashMap <>();
+
+    ArrayList<Pair<Pair<Integer, Integer>, Pair<Integer,Integer>>> possibleMoves = new ArrayList <>();
 
     /*At any given moment, there can only be two swaps.
       swap_source and swap_dest objects keep track of which two positions in the board are to be swapped
@@ -65,6 +86,8 @@ public class MainActivity extends AppCompatActivity {
     public void swap(View view)
     {
 
+        //if there are any blinking animations, clear them first
+        clearBlinkEffect();
         ImageView stone = (ImageView) view;
 
         String current_stone_color = stone.getTag().toString();
@@ -154,6 +177,9 @@ public class MainActivity extends AppCompatActivity {
             //update current player's score
             updateScore();
 
+            //reset Any hints because older hints may not be relevant anymore after the user has moved a stone
+            resetHints();
+
 
             //If the player cannot make another move (by same stone), switch player
             Pair<Integer, Integer> stone_pos = position_map.get(view.getId());
@@ -165,6 +191,7 @@ public class MainActivity extends AppCompatActivity {
             {
                 turnSkipButton.setVisibility(View.VISIBLE);
                 chain_move = true;
+                resetHints();
                 destination_id = swap_dest.getId();
             }
 
@@ -174,6 +201,35 @@ public class MainActivity extends AppCompatActivity {
             reset_select();
         }
 
+    }
+
+    /*This function resets the array named possibleMoves and resets hintsNumber to 0.
+      possibleMoves contain a list of possible hints (or moves) for any player that clicks hints
+
+      RETURNS: This function does not return anything
+    */
+
+
+    void initializeSpinner()
+    {
+        //set Spinner
+        Spinner mySpinner = (Spinner) findViewById(R.id.spinner);
+
+       ArrayAdapter<String> arrayAdapter = new ArrayAdapter <String>(MainActivity.this, R.layout.support_simple_spinner_dropdown_item,
+                                            searchAlgorithms);
+        arrayAdapter.setDropDownViewResource(R.layout.support_simple_spinner_dropdown_item);
+        mySpinner.setAdapter(arrayAdapter);
+
+
+    }
+
+    public void resetHints()
+    {
+        hintNumber = 0;
+        possibleMoves.clear();
+
+        //clear blinking effect if there are any
+        clearBlinkEffect();
     }
 
     //This function iterates over the position_map and finds Id of Imageview of given Pair of row and column positions
@@ -293,6 +349,105 @@ public class MainActivity extends AppCompatActivity {
             initializeGame();
     }
 
+    void blinkEffect()
+    {
+        if(sourceBlink != null && destBlink != null) {
+
+            Animation sourceAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
+            sourceBlink.startAnimation(sourceAnimation);
+
+            Animation destAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
+            destBlink.startAnimation(destAnimation);
+        }
+
+
+    }
+
+    void clearBlinkEffect()
+    {
+        if(sourceBlink !=null && destBlink !=null)
+        {
+            sourceBlink.clearAnimation();
+            destBlink.clearAnimation();
+        }
+    }
+
+    void hint(View view)
+    {
+        //Get the current spinner value
+        Spinner spinner = findViewById(R.id.spinner);
+        String selectedSearchAlgorithm = spinner.getSelectedItem().toString();
+
+        //If the player wants to use a different search algorithm from the currently used one,
+        //we want to reset the past hints to free up the associated global arrayList and variables
+        //used to store hints
+        if(!selectedSearchAlgorithm.equals(currentSearchAlgorithm))
+            resetHints();
+
+        //if there are no hints yet, we want to run the search Algorithms
+       if(hintNumber == 0)
+           if(selectedSearchAlgorithm.equals(searchAlgorithms[0]))
+           {
+               //System.out.println(selectedSearchAlgorithm+" is not Implemented yet");
+               game.bfsSearch(game.activePlayer.getColor(), possibleMoves);
+               for(int i=0; i<possibleMoves.size(); i++)
+               {
+                   System.out.println(searchAlgorithms[0]+": "+possibleMoves.get(i).first.first+" "+ possibleMoves.get(i).first.second+" ---> "+possibleMoves.get(i).second.first+" "+possibleMoves.get(i).second.second);
+               }
+           }
+           else if(selectedSearchAlgorithm.equals(searchAlgorithms[1]))
+           {
+               System.out.println(selectedSearchAlgorithm+" is not Implemented yet");
+               return;
+           }
+           else {
+               game.dfsSearch(game.activePlayer.getColor(), possibleMoves);
+               for(int i=0; i<possibleMoves.size(); i++)
+               {
+                   System.out.println(searchAlgorithms[2]+": "+possibleMoves.get(i).first.first+" "+ possibleMoves.get(i).first.second+" ---> "+possibleMoves.get(i).second.first+" "+possibleMoves.get(i).second.second);
+               }
+           }
+
+
+        Pair <Pair <Integer, Integer>, Pair <Integer, Integer>> moves;
+       try {
+           moves = possibleMoves.get(hintNumber);
+       }catch (IndexOutOfBoundsException e)
+       {
+           hintNumber = 0;
+           moves = possibleMoves.get(hintNumber);
+       }
+
+
+       //If it's a chain move, we don't want to generate any other hints than
+        //the move user's current selected stone can make
+       if(chain_move == true)
+       {
+           int current_row = -1;
+           int current_col = -1;
+           hintNumber = -1;
+           Pair<Integer, Integer> source = position_map.get(destination_id);
+           while(current_row != source.first && current_col != source.second)
+           {
+               hintNumber++;
+               current_row = possibleMoves.get(hintNumber).first.first;
+               current_col = possibleMoves.get(hintNumber).first.second;
+           }
+           moves = possibleMoves.get(hintNumber);
+       }
+
+        //before starting new animation, clear the existing animation
+        clearBlinkEffect();
+
+       sourceBlink = findViewById(getId(moves.first.first, moves.first.second));
+       destBlink = findViewById(getId(moves.second.first, moves.second.second));
+        System.out.println(moves.first.first+" "+ moves.first.second+" ---> "+moves.second.first+" "+moves.second.second);
+        hintNumber++;
+
+        blinkEffect();
+
+    }
+
     //Make a Toast appear on screen with the message given in parameter
     private void makeToast(String message)
     {
@@ -358,8 +513,6 @@ public class MainActivity extends AppCompatActivity {
 
 
         //Give Each Player player ID
-        //player1.PLAYER_ID = findViewById(R.id.player1_score).getId();
-        //player2.PLAYER_ID = findViewById(R.id.player2_score).getId();
         game.player1.setId(findViewById(R.id.player1_score).getId());
         game.player2.setId(findViewById(R.id.player2_score).getId());
     }
@@ -392,6 +545,8 @@ public class MainActivity extends AppCompatActivity {
         game = new Game();
 
         turnSkipButton = findViewById(R.id.skipTurn);
+
+        initializeSpinner();
 
         initializeGame();
     }

@@ -1,12 +1,18 @@
 package com.example.wills.konane;
 
 import android.content.Context;
+import android.util.Pair;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Stack;
 
 
 /**
@@ -25,17 +31,17 @@ public class Game {
     /*This function checks if the current player is legal
       Returns True if legal, false otherwise
     */
-    public boolean isLegalPlayer(String current_stone_color)
-    {
-        if(current_stone_color.equals(activePlayer.getColor()))
-        {
+    public boolean isLegalPlayer(String current_stone_color) {
+        if (current_stone_color.equals(activePlayer.getColor())) {
             return true;
         }
         return false;
     }
 
     /*This function returns true if the game is Over else false*/
-    public boolean isGameOver(){return game_over;}
+    public boolean isGameOver() {
+        return game_over;
+    }
 
 
     /*This function switches player from active player to inactive player in this order:
@@ -45,35 +51,27 @@ public class Game {
             YES: Keep
 
      */
-    public Boolean switchPlayer()
-    {
+    public Boolean switchPlayer() {
         Boolean player_switched = true;
 
-        if (activePlayer == player1)
-        {
-            if(player2.hasValidMove(board) == false)
-            {
-                if(player1.hasValidMove(board) == false)
+        if (activePlayer == player1) {
+            if (player2.hasValidMove(board) == false) {
+                if (player1.hasValidMove(board) == false)
                     decideWinner();
                 else
                     player_switched = false;
 
-            }
-            else {
+            } else {
 
                 activePlayer = player2;
             }
-        }
-        else if(activePlayer == player2)
-        {
-            if(player1.hasValidMove(board) == false)
-            {
+        } else if (activePlayer == player2) {
+            if (player1.hasValidMove(board) == false) {
                 if (player2.hasValidMove(board) == false)
                     decideWinner();
                 else
                     player_switched = false;
-            }
-            else {
+            } else {
 
                 activePlayer = player1;
             }
@@ -82,13 +80,197 @@ public class Game {
         return player_switched;
     }
 
-//    public void dfsSearch(String stoneColor)
-//    {
-//        for(int row=0; row<board.NUM_BLOCKS; row++)
-//        {
-//            for(int )
-//        }
-//    }
+    public void dfsSearch(String stoneColor, ArrayList<Pair<Pair<Integer,Integer>,Pair<Integer,Integer>>> possibleMoves) {
+        Boolean[][] visited = new Boolean[6][6];
+
+        populateArray(visited);
+        int row, col;
+
+
+        //We want to begin search from the first possible move of the stone of "stoneColor" (from parameter)
+        //Board class automatically updates the first possible move of black and white stone both
+        //so we can easily grab that
+        if(stoneColor.equals(board.BLACK_STONE)){
+            row = board.FIRST_MOVABLE_BLACK.first;
+            col = board.FIRST_MOVABLE_BLACK.second;
+        }
+        else{
+            row = board.FIRST_MOVABLE_WHITE.first;
+            col = board.FIRST_MOVABLE_WHITE.second;
+        }
+
+        Stack<Pair<Integer,Integer>> s = new Stack<>();
+        Pair<Integer,Integer> start = new Pair <>(row,col);
+
+
+        s.push(start);
+
+        while(s.empty() == false) {
+            //an empty Pair data structure (that contains another pair of integers) to contain north, east, south, west moves
+            Pair<Pair<Integer,Integer>,Pair<Integer,Integer>> moves = null;
+
+            Pair <Integer, Integer> current_stone = s.peek();
+            s.pop();
+
+            if (visited[current_stone.first][current_stone.second] == false) {
+                visited[current_stone.first][current_stone.second] = true;
+
+                //You only need to add the neighbors (north, east,south, west) to the hashMap if the current
+                //stone has same color as the one in the parameter
+                if (board.BOARD[current_stone.first][current_stone.second] == stoneColor) {
+                    Pair <Integer, Integer> west = board.getPositionWest(current_stone.first, current_stone.second);
+                    Pair <Integer, Integer> south = board.getPositionSouth(current_stone.first, current_stone.second);
+                    Pair <Integer, Integer> east = board.getPositionEast(current_stone.first, current_stone.second);
+                    Pair <Integer, Integer> north = board.getPositionNorth(current_stone.first, current_stone.second);
+
+                    //If the position is not garbage (i.e = -1) and if the position is not already visited,
+                    //then push the position to stack
+
+                    if (west.first != -1) {
+                        //System.out.println("West "+west.first+west.second);
+                        moves = new Pair <>(current_stone, west);
+                        possibleMoves.add(moves);
+                    }
+                    if (south.first != -1) {
+                        //System.out.println("South "+south.first+south.second);
+                        moves = new Pair <>(current_stone,south);
+                        possibleMoves.add(moves);
+                    }
+                    if (east.first != -1) {
+                        //System.out.println("East "+east.first+east.second);
+                        moves = new Pair <>(current_stone,east);
+                        possibleMoves.add(moves);
+                    }
+                    if (north.first != -1) {
+                        //System.out.println("North "+north.first+north.second);
+                        moves = new Pair <>(current_stone,north);
+                        possibleMoves.add(moves);
+                    }
+
+                }
+            }
+
+            int current_row = current_stone.first;
+            int current_col = current_stone.second;
+
+            //push the element below the current element onto the stack
+            if(current_row+1 <6 && visited[current_row+1][current_col] == false) {
+                //if current_col is equal to 5 (i.e the end), start pushing from the beginning (i.e from column 0)
+                if(current_col == 5)
+                    s.push(new Pair <>(current_row + 1, 0));
+                else
+                    s.push(new Pair <>(current_row+1, current_col));
+            }
+
+            //Push the element on the right of current element onto the stack
+            if(current_col+1 < 6 && visited[current_row][current_col+1] == false)
+                s.push(new Pair <>(current_row,current_col+1));
+        }
+
+    }
+
+
+    public void bfsSearch(String stoneColor, ArrayList<Pair<Pair<Integer,Integer>,Pair<Integer,Integer>>> possibleMoves)
+    {
+        Boolean[][] visited = new Boolean[6][6];
+
+        populateArray(visited);
+        int row, col;
+
+
+        //We want to begin search from the first possible move of the stone of "stoneColor" (from parameter)
+        //Board class automatically updates the first possible move of black and white stone both
+        //so we can easily grab that
+        if(stoneColor.equals(board.BLACK_STONE)){
+            row = board.FIRST_MOVABLE_BLACK.first;
+            col = board.FIRST_MOVABLE_BLACK.second;
+        }
+        else{
+            row = board.FIRST_MOVABLE_WHITE.first;
+            col = board.FIRST_MOVABLE_WHITE.second;
+        }
+
+        Queue<Pair<Integer,Integer>> q = new LinkedList <>();
+        Pair<Integer,Integer> start = new Pair <>(row,col);
+
+        visited[start.first][start.second] = true;
+
+        q.add(start);
+
+        while(!q.isEmpty())
+        {
+            Pair<Integer,Integer> current_stone = q.peek();
+            q.remove();
+
+            Pair<Pair<Integer,Integer>,Pair<Integer,Integer>> moves = null;
+
+            //You only need to add the neighbors (north, east,south, west) to the hashMap if the current
+            //stone has same color as the one in the parameter
+            if (board.BOARD[current_stone.first][current_stone.second] == stoneColor) {
+                Pair <Integer, Integer> west = board.getPositionWest(current_stone.first, current_stone.second);
+                Pair <Integer, Integer> south = board.getPositionSouth(current_stone.first, current_stone.second);
+                Pair <Integer, Integer> east = board.getPositionEast(current_stone.first, current_stone.second);
+                Pair <Integer, Integer> north = board.getPositionNorth(current_stone.first, current_stone.second);
+
+                //If the position is not garbage (i.e = -1) and if the position is not already visited,
+                //then push the position to stack
+
+                if (west.first != -1) {
+                    //System.out.println("West "+west.first+west.second);
+                    moves = new Pair <>(current_stone, west);
+                    possibleMoves.add(moves);
+                }
+                if (south.first != -1) {
+                    //System.out.println("South "+south.first+south.second);
+                    moves = new Pair <>(current_stone,south);
+                    possibleMoves.add(moves);
+                }
+                if (east.first != -1) {
+                    //System.out.println("East "+east.first+east.second);
+                    moves = new Pair <>(current_stone,east);
+                    possibleMoves.add(moves);
+                }
+                if (north.first != -1) {
+                    //System.out.println("North "+north.first+north.second);
+                    moves = new Pair <>(current_stone,north);
+                    possibleMoves.add(moves);
+                }
+
+            }
+
+            int current_row = current_stone.first;
+            int current_col = current_stone.second;
+
+
+            //Push the element on the right of current element onto the stack
+            if(current_col+1 < 6 && visited[current_row][current_col+1] == false) {
+                q.add(new Pair <>(current_row, current_col + 1));
+                visited[current_row][current_col+1] = true;
+            }
+
+            //push the element below the current element onto the stack
+            if(current_row+1 <6 && visited[current_row+1][current_col] == false) {
+                //if current_col is equal to 5 (i.e the end), start pushing from the beginning (i.e from column 0)
+                q.add(new Pair <>(current_row + 1, current_col));
+                visited[current_row+1][current_col] = true;
+
+            }
+
+        }
+
+    }
+
+    
+
+
+
+    public void populateArray(Boolean[][] visited)
+    {
+        for(int i=0; i<board.NUM_BLOCKS; i++)
+            for (int j=0; j<board.NUM_BLOCKS;j++)
+                visited[i][j] = false;
+    }
+
 
     /*This function resets board, player1 and player2 to their initial state.
       It sets player1 as currently active player
@@ -225,7 +407,6 @@ public class Game {
 
                 if(buffer == null)
                     break;
-                System.out.println(buffer);
 
                 if (line_counter == 0 || line_counter == 1)
                 {
@@ -262,11 +443,8 @@ public class Game {
             e.printStackTrace();
             successful_load = false;
         }
-        board.printTable();
         return successful_load;
     }
-
-
 
 
 }
