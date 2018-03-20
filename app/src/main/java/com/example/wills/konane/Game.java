@@ -12,6 +12,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.Array;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,12 +31,26 @@ public class Game {
     public Player player2 = new Player(false, board.WHITE_STONE, "White");
     public Player activePlayer = player1;
     private Boolean game_over = false;
+    private int minimaxPly = 2;
+    private TravelPath minMaxTravelPath = null;
 
     public ArrayList<TravelPath> minMaxRootValues = new ArrayList<>();
 
     Game(int boardSize){
 
         board = new Board(boardSize);
+    }
+
+    public TravelPath getMinMaxTravelPath(){
+        return minMaxTravelPath;
+    }
+
+    public void setMinMaxTravelPath(TravelPath travelPath){
+        this.minMaxTravelPath = travelPath;
+    }
+
+    public void setPly(int ply){
+        minimaxPly = ply;
     }
 
     Board getBoardObj(){
@@ -493,39 +508,46 @@ public class Game {
         return null;
     }
 
-    public Player getComputerPlayer(){
 
-        if(player1.isComputer() == true)
-            return player1;
-
-        return player2;
-
-    }
-
-    public void callMinimax(int ply,int depth, Player currentPlayer){
+    public void callMinimax(Player currentPlayer){
+        minMaxTravelPath = null;
         minMaxRootValues.clear();
-        int m = minimax(ply,depth, currentPlayer);
+        int score;
+
+        if(currentPlayer.getColor().equals(board.WHITE_STONE)) {
+            System.out.println("####### "+" calling minimax for "+currentPlayer.getName());
+            score = minimaxPlayer2(0, currentPlayer);
+        }
+        else {
+            System.out.println("####### "+" calling minimax for "+currentPlayer.getName());
+            score = minimaxPlayer1(0, currentPlayer);
+        }
+
+        minMaxTravelPath = getBestMove();
 
 
     }
 
     public TravelPath getBestMove(){
-        TravelPath t = minMaxRootValues.get(0);
-        int max_score = t.getScore();
-        for(TravelPath tp: minMaxRootValues){
-            if(tp.getScore() > max_score){
-                t = tp;
-                max_score = t.getScore();
+        if(minMaxRootValues.size() > 0) {
+            TravelPath t = minMaxRootValues.get(0);
+            int max_score = t.getScore();
+            for (TravelPath tp : minMaxRootValues) {
+                if (tp.getScore() > max_score) {
+                    t = tp;
+                    max_score = t.getScore();
+                }
             }
-        }
 
-        return t;
+            return t;
+        }
+        return null;
     }
 
-    //This min max favors player1. needs changes. read comment
-    public int minimax(int ply,int depth,  Player currentPlayer){
+    //This min max favors player2. needs changes. read comment
+    public int minimaxPlayer2(int depth,  Player currentPlayer){
 
-        //System.out.println("Depth "+depth);
+        System.out.println("Depth "+depth);
         //board.printTable();
 
         //if current player is winning return 1
@@ -539,8 +561,8 @@ public class Game {
             return -1;
         }
 
-        if (depth > ply){
-            int minHeuristic = getMinMaxHeuristic();
+        if (depth > minimaxPly){
+            int minHeuristic = getMinMaxHeuristic(player2.getName());
             //System.out.println("Min Heuristic "+minHeuristic);
             return minHeuristic;
         }
@@ -563,12 +585,11 @@ public class Game {
 
         //I'm not sure why this condition has to be checked. This seems to work after stepping through the debugger several hundred times
         //Any answers will be awarded a million dollars
-        if(ply >= depth) {
+        if(minimaxPly >= depth) {
             //copy board to restorePointBoard array
             board.makeCopy(restorePointBoard);
             //System.out.println("Saving restore point: ");
         }
-        board.printTable();
 
         for (int i = 0; i < availableMoves.size(); i++) {
 
@@ -580,7 +601,7 @@ public class Game {
                 //System.out.println("Moving player 2 "+point);
                 move(point);
 
-                int currentScore = minimax(ply,depth+1, player1);
+                int currentScore = minimaxPlayer2(depth+1, player1);
                 //System.out.println("current Score player 1: "+currentScore);
                 scores.add(currentScore);
                 //System.out.println("Scores: "+scores.toString());
@@ -593,7 +614,7 @@ public class Game {
             }else if(currentPlayer.equals(player1)){
                 move(point);
                 //System.out.println("Moving player1 "+point);
-                int currentScore = minimax(ply,depth+1, player2);
+                int currentScore = minimaxPlayer2(depth+1, player2);
                 //System.out.println("current Score player 2: "+currentScore);
 
                 scores.add(currentScore);
@@ -602,10 +623,95 @@ public class Game {
             }
             board.restoreBoard(restorePointBoard);
             //System.out.println("Board Restored: ");
-            board.printTable();
         }
 
         if(currentPlayer.equals(player2)){
+            return Collections.max(scores);
+        }
+        return Collections.min(scores);
+    }
+
+    public int minimaxPlayer1(int depth,  Player currentPlayer){
+
+        System.out.println("Depth "+depth);
+        //board.printTable();
+
+        //if current player is winning return 1
+        if (getWinner() != null && getWinner().equals(currentPlayer)) {
+            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return 1");
+            return 1;
+        }
+        //if current player is not winning return -1
+        if (getWinner() != null && getWinner().equals(currentPlayer) == false) {
+            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return -1");
+            return -1;
+        }
+
+        if (depth > minimaxPly){
+            int minHeuristic = getMinMaxHeuristic(player1.getName());
+            //System.out.println("Min Heuristic "+minHeuristic);
+            return minHeuristic;
+        }
+
+
+        ArrayList<TravelPath> availableMoves = getAllPossibleMoves(currentPlayer.getColor());
+        if (availableMoves.isEmpty())
+        {
+            //System.out.println("No available moves");
+            return 0;
+        }
+
+
+        ArrayList<Integer> scores = new ArrayList<>();
+
+        //Each recursion is a new change in game state. After coming
+        //back from the recursion, we need to restore the game state's to it's
+        //original state. Hence, we need to copy the board
+        String[][] restorePointBoard = new String[board.BOARD_SIZE][board.BOARD_SIZE];
+
+        //I'm not sure why this condition has to be checked. This seems to work after stepping through the debugger several hundred times
+        //Any answers will be awarded a million dollars
+        if(minimaxPly >= depth) {
+            //copy board to restorePointBoard array
+            board.makeCopy(restorePointBoard);
+            //System.out.println("Saving restore point: ");
+        }
+
+        for (int i = 0; i < availableMoves.size(); i++) {
+
+            TravelPath point = availableMoves.get(i);
+            //System.out.println("Point: "+point);
+
+            //change this line to currentPlayer.isComputer() later
+            if (currentPlayer.equals(player1)) {
+                //System.out.println("Moving player 2 "+point);
+                move(point);
+
+                int currentScore = minimaxPlayer2(depth+1, player2);
+                //System.out.println("current Score player 1: "+currentScore);
+                scores.add(currentScore);
+                //System.out.println("Scores: "+scores.toString());
+
+                if(depth == 0){
+                    //System.out.println("Depth 0 point "+point);
+                    point.setMiniMaxValue(currentScore);
+                    minMaxRootValues.add(point);
+                }
+            }else if(currentPlayer.equals(player2)){
+                move(point);
+                //System.out.println("Moving player1 "+point);
+                int currentScore = minimaxPlayer1(depth+1, player1);
+                //System.out.println("current Score player 2: "+currentScore);
+
+                scores.add(currentScore);
+
+                //System.out.println("Scores: "+scores.toString());
+            }
+            board.restoreBoard(restorePointBoard);
+            //System.out.println("Board Restored: ");
+        }
+
+        if(currentPlayer.equals(player1)){
             return Collections.max(scores);
         }
         return Collections.min(scores);
@@ -615,7 +721,7 @@ public class Game {
 
     //Utility function for minimax Algorithm that calculates
     //it favors player2 (read minimax comments to fix this)
-    public int getMinMaxHeuristic(){
+    public int getMinMaxHeuristic(String favor){
         //Get all the possible moves of player1
         ArrayList<TravelPath> travelPathsPlayer1 = getAllPossibleMoves(player1.getColor());
         int player1MaxScore = Integer.MIN_VALUE;
@@ -634,30 +740,43 @@ public class Game {
                 player2MaxScore = t.getScore();
         }
 
-        System.out.println(player2.getName()+" Heuristic "+player1MaxScore);
-
-        return player2MaxScore - player1MaxScore;
+        //System.out.println(player2.getName()+" Heuristic "+player1MaxScore);
+        if(favor.equals(player2.getName())) {
+            return player2MaxScore - player1MaxScore;
+        }else{
+            return player1MaxScore - player2MaxScore;
+        }
     }
 
     /*Utility function for minimax algorithm and MainActivity
       This function moves stone from source to destination of Travelpath object and empties all the
       cells in between
      */
-    public void move(TravelPath travelPath){
+    public ArrayList<Cell> move(TravelPath travelPath){
 
-        Cell source = travelPath.getSource();
-        Cell dest = travelPath.getDestination();
+        ArrayList<Cell> path = travelPath.getPath();
+        ArrayList<Cell> middleCells = new ArrayList<>(); //middle cells that are emptied while moving source and dest
+        //if there is no path, we have no business here
+        if(path.size() == 0)
+            return null;
 
-        //copy source to destination
-        board.BOARD[dest.getRow()][dest.getCol()] = board.BOARD[source.getRow()][source.getCol()];
+        Cell source = path.get(0);
 
-        //empty every cells except destination
-        for(Cell each: travelPath.getPath()){
+        for(int i=1; i<path.size(); i++){
+            Cell[] middle = new Cell[1];
+            Cell dest = path.get(i);
 
-            if(!each.equals(dest)){
-                board.BOARD[each.getRow()][each.getCol()] = board.EMPTY_SPOT;
+            if(board.move(source, dest, middle)){
+                middleCells.add(middle[0]);
+
+                //New source is the Cell with previous source's color and destination's coordinates
+                source = new Cell(dest.getRow(), dest.getCol(), source.getColor());
             }
         }
+
+        return middleCells;
     }
 
 }
+
+

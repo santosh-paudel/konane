@@ -41,6 +41,8 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import static android.widget.Toast.makeText;
 
@@ -61,21 +63,15 @@ public class MainActivity extends AppCompatActivity {
     //Numeric value to keep track of the number of hints asked by the user
     public static int hintNumber = 0;
 
-    //Global variable to represent depth cut off
-    //default depth cut off value is 5
-    public static int plyCutOff = -1;
-
     //At any given time, if the user clicks hint, only two imageview object can have blink animation.
     //That object should be globally accessible to start and end animations from any functions.
     ImageView sourceBlink = null;
     ImageView destBlink = null;
 
 
-
-
     //Every users (black and white) have a a set of possible moves in their turn. This hashmap keeps track of their possible moves
     //public static HashMap<Pair<Integer,Integer>, ArrayList<Pair<Integer,Integer>>> possibleMoves = new HashMap <>();
-    ArrayList<Pair<Pair<Integer, Integer>, Pair<Integer,Integer>>> possibleMoves = new ArrayList <>();
+    Queue<Cell> possibleMoves = new LinkedList<>();
 
     /*At any given moment, there can only be two swaps.
       swap_source and swap_dest objects keep track of which two positions in the board are to be swapped
@@ -96,7 +92,6 @@ public class MainActivity extends AppCompatActivity {
     private static HashMap<Integer, Pair<Integer, Integer>> position_map = new HashMap<Integer, Pair<Integer, Integer>>();
 
 
-
     /*
         This function handles the swap of two stones. It uses global ImageView objects swap_source and swap_dest to determine source
         and destination of swap process. It checks if the source is selected (by taking advantage of global source_selected) flag. It makes use of
@@ -105,8 +100,7 @@ public class MainActivity extends AppCompatActivity {
 
         Parameter: View object
      */
-    public void swap(View view)
-    {
+    public void swap(View view) {
 
         //if there are any blinking animations, clear them first
         clearBlinkEffect();
@@ -115,35 +109,34 @@ public class MainActivity extends AppCompatActivity {
         String current_stone_color = stone.getTag().toString();
 
         //Check if it's illegal player
-        if(game.isLegalPlayer(current_stone_color) == false && swap_source == null){
+        if (game.isLegalPlayer(current_stone_color) == false && swap_source == null) {
             makeToast("Not Your Turn");
             return;
         }
 
         //If the source is not selected, first click should be the source
-        if(source_selected == false)
-        {
+        if (source_selected == false) {
             swap_source = stone;
 
             //If the clicked field is empty, we perform no action
-            if(stone.getDrawable() == null)
-            {
+            if (stone.getDrawable() == null) {
                 reset_select();
-            }
-            else{
+            } else {
 
-                if(chain_move == true && swap_source.getId() != MultiJumpSourceId)
-                {
+                if (chain_move == true && swap_source.getId() != MultiJumpSourceId) {
                     makeToast("Wrong one selected");
                     reset_select();
                     return;
                 }
+
+                if(game.activePlayer.isComputer() == true){
+                   reset_select();
+                   return;
+                }
                 source_selected = true;
                 swap_source.setBackgroundColor(Color.parseColor("#40F96E00"));
             }
-        }
-        else
-        {
+        } else {
             swap_dest = (ImageView) view;
 
             Pair<Integer, Integer> source_pos = position_map.get(swap_source.getId()); //Position of the source in Pair of row and column
@@ -159,20 +152,16 @@ public class MainActivity extends AppCompatActivity {
             //check if the source and destination are swappable on the board
             boolean swappable;
             swappable = game.moveStone(source, dest, middle_pos);
-            if (swappable == false)
-            {
+            if (swappable == false) {
                 reset_select();
                 makeToast("Invalid Move");
                 return;
             }
 
 
-            if(swap_source.getTag().equals(game.getBoardObj().BLACK_STONE))
-            {
+            if (swap_source.getTag().equals(game.getBoardObj().BLACK_STONE)) {
                 swap_dest.setImageResource(R.drawable.black_stone);
-            }
-            else if(swap_source.getTag().equals(game.getBoardObj().WHITE_STONE))
-            {
+            } else if (swap_source.getTag().equals(game.getBoardObj().WHITE_STONE)) {
                 swap_dest.setImageResource(R.drawable.white_stone);
             }
 
@@ -201,7 +190,7 @@ public class MainActivity extends AppCompatActivity {
             middle.setTag(game.getBoardObj().EMPTY_SPOT);
 
             //update current player's score
-            updateScore();
+            updateScore(true);
 
             //reset Any hints because older hints may not be relevant anymore after the user has moved a stone
             resetHints();
@@ -209,12 +198,10 @@ public class MainActivity extends AppCompatActivity {
 
             //If the player cannot make another move (by same stone), switch player
             Pair<Integer, Integer> stone_pos = position_map.get(view.getId());
-            if(!game.activePlayer.isAnotherMove(game.getBoardObj(), stone_pos.first, stone_pos.second)) {
+            if (!game.activePlayer.isAnotherMove(game.getBoardObj(), stone_pos.first, stone_pos.second)) {
                 chain_move = false;
                 switchPlayer();
-            }
-            else
-            {
+            } else {
                 turnSkipButton.setVisibility(View.VISIBLE);
                 chain_move = true;
                 resetHints();
@@ -234,8 +221,7 @@ public class MainActivity extends AppCompatActivity {
     */
 
 
-    public void resetHints()
-    {
+    public void resetHints() {
         hintNumber = 0;
         possibleMoves.clear();
 
@@ -244,32 +230,32 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //This function iterates over the position_map and finds Id of Imageview of given Pair of row and column positions
-    int getId(int middle_row, int middle_col)
-    {
-        for(Integer id: position_map.keySet())
-        {
-            Pair<Integer,Integer> middle_stone  = position_map.get(id);
-            if(middle_stone.first == middle_row && middle_stone.second == middle_col)
-            {
+    int getId(int middle_row, int middle_col) {
+        for (Integer id : position_map.keySet()) {
+            Pair<Integer, Integer> middle_stone = position_map.get(id);
+            if (middle_stone.first == middle_row && middle_stone.second == middle_col) {
                 return id;
             }
         }
         return 0;
     }
 
-    /*This function updates player score on the screen*/
-    private void updateScore()
-    {
-        game.activePlayer.incrementScore();
+    /*This function updates player score on the screen. If increment is true,
+    it increases the current player's score. Otherwise, it just displays score on
+    the screen
+     */
+    private void updateScore(Boolean increment) {
+        if(increment == true) {
+            game.activePlayer.incrementScore();
+        }
         TextView score_view = findViewById(game.activePlayer.getId());
         int score = game.activePlayer.getScore();
-        score_view.setText(""+score);
+        score_view.setText("" + score);
 
     }
 
     //resets source and destination selection
-    private void reset_select()
-    {
+    private void reset_select() {
         if (swap_source != null)
             swap_source.setBackgroundColor(Color.WHITE);
         swap_source = null;
@@ -278,13 +264,11 @@ public class MainActivity extends AppCompatActivity {
         clearBlinkEffect();
     }
 
-    public void skipTurn(View view)
-    {
+    public void skipTurn(View view) {
         chain_move = false;
         reset_select();
         switchPlayer();
     }
-
 
 
     /*This function calls switchPlayer function from game class.
@@ -293,18 +277,20 @@ public class MainActivity extends AppCompatActivity {
 
        This function then checks if there are any winners. If there are, it calls declareWinnder() function
      */
-    private void switchPlayer()
-    {
+    private void switchPlayer() {
         String currentPlayerName = game.activePlayer.getName();
 
         if (game.switchPlayer() == false)
-            makeToast("Another player has no moves. "+ currentPlayerName+ ", play again!");
+            makeToast("Another player has no moves. " + currentPlayerName + ", play again!");
 
         highlightPlayer(game.activePlayer.getColor());
 
-        if(game.isGameOver() == true)
+        if (game.isGameOver() == true)
             declareWinner();
 
+        if(game.activePlayer.isComputer()){
+            generateMinMaxMoves();
+        }
         turnSkipButton.setVisibility(View.INVISIBLE);
     }
 
@@ -314,14 +300,13 @@ public class MainActivity extends AppCompatActivity {
     /*This function checks if any player has won or if there's a draw.
       It makes linear layout appear with a congratulations message
      */
-    void declareWinner()
-    {
+    void declareWinner() {
         String winner_msg = "none";
 
-        if(game.player1.hasWon() == true)
-            winner_msg = game.player1.getName()+" has Won!";
-        else if(game.player2.hasWon() == true)
-            winner_msg = game.player2.getName()+" has Won";
+        if (game.player1.hasWon() == true)
+            winner_msg = game.player1.getName() + " has Won!";
+        else if (game.player2.hasWon() == true)
+            winner_msg = game.player2.getName() + " has Won";
         else
             winner_msg = "It's a draw";
 
@@ -331,35 +316,32 @@ public class MainActivity extends AppCompatActivity {
 
     /*This function resets all parameters to get the game back to ready state!
      */
-    void replay(View view)
-    {
+    void replay(View view) {
         game.resetGame();
         initializeGame(game.getBoardObj().BOARD_SIZE, true);
     }
 
-    void saveGame()
-    {
+    void saveGame() {
         boolean successful_save = false;
-        if(ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, EXTERNAL_STORAGE_WRITE_PERMISSION_CODE);
-        }else {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, EXTERNAL_STORAGE_WRITE_PERMISSION_CODE);
+        } else {
             successful_save = game.saveGame(getApplicationContext());
         }
 
-        if(successful_save == false)
+        if (successful_save == false)
             makeToast("Could not save file");
         else
             makeToast("Saved!");
 
     }
 
-    void loadGame(Uri fileName)
-    {
+    void loadGame(Uri fileName) {
         boolean successful_load;
 
         successful_load = game.loadGameFromFile(getApplicationContext(), fileName);
 
-        if(successful_load == false)
+        if (successful_load == false)
             makeToast("Game could not be loaded");
         else
             reset_select();
@@ -368,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
         initializeGame(game.getBoardObj().BOARD_SIZE, false);
     }
 
-    public void loadGameFromFile(){
+    public void loadGameFromFile() {
 
         // ACTION_OPEN_DOCUMENT is the intent to choose a file via the system's file
         // browser.
@@ -388,9 +370,15 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    void blinkEffect()
-    {
-        if(sourceBlink != null && destBlink != null) {
+    void blinkEffect() {
+        if (sourceBlink != null && destBlink != null) {
+
+            System.out.println("BLINK");
+            int sourceid= sourceBlink.getId();
+            System.out.println("SOURCE "+position_map.get(sourceid));
+            int destid = destBlink.getId();
+            System.out.println("DEST "+position_map.get(destid));
+
 
             Animation sourceAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
             sourceBlink.startAnimation(sourceAnimation);
@@ -402,10 +390,8 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    void clearBlinkEffect()
-    {
-        if(sourceBlink !=null && destBlink !=null)
-        {
+    void clearBlinkEffect() {
+        if (sourceBlink != null && destBlink != null) {
             sourceBlink.clearAnimation();
             destBlink.clearAnimation();
         }
@@ -433,40 +419,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-    void hint(View view)
-    {
-
-        if(game.activePlayer.equals(game.player2)){
-            makeToast("player 2 is playing");
-
-            MiniMaxAlgorithmTask mtask = new MiniMaxAlgorithmTask();
-            mtask.execute(game.player2);
-
-        }else
-        {
-            makeToast("Player 2 only");
+    void hint(View view) {
+        if(game.activePlayer.isComputer() == false) {
+            clearBlinkEffect();
+            if (hintNumber == 0) {
+                generateMinMaxMoves();
+            } else {
+                showHumanMove();
+            }
         }
-//        System.out.println("Hint");
-//        ArrayList<TravelPath> travelPaths = game.getAllPossibleMoves("W");
-//
-//        for(int i=0; i<travelPaths.size(); i++){
-//            ArrayList<Cell> cells = travelPaths.get(i).getPath();
-//            for(Cell cell:cells){
-//                System.out.print(cell.getRow()+","+cell.getCol()+" -> ");
-//            }
-//            System.out.println("");
-//        }
-//
-//        System.out.println("MINIMAX");
-//        game.minimax(0, 5, game.player1);
-
-
     }
 
     //Make a Toast appear on screen with the message given in parameter
-    private void makeToast(String message)
-    {
+    private void makeToast(String message) {
         Toast toat = (Toast) makeText(MainActivity.this, message, Toast.LENGTH_SHORT);
         toat.show();
     }
@@ -478,20 +443,21 @@ public class MainActivity extends AppCompatActivity {
 
       RETURNS: integer pixel
      */
-    public int convertDpToPx(int dp){
+    public int convertDpToPx(int dp) {
 
         DisplayMetrics metrics = getResources().getDisplayMetrics();
 
-        return Math.round(dp*metrics.density);
+        return Math.round(dp * metrics.density);
     }
 
 
     /**
      * Konane grid has label on the top and on the left. The labels number the grid's row and column.
+     *
      * @param dimension
      * @param boardSize
      */
-    public void updateGridLabel(int dimension, int boardSize){
+    public void updateGridLabel(int dimension, int boardSize) {
 
         LinearLayout leftLabel = findViewById(R.id.gridLabelLeft);
         LinearLayout topLabel = findViewById(R.id.gridLabelTop);
@@ -502,7 +468,7 @@ public class MainActivity extends AppCompatActivity {
 
         //set left label
         int marginOffset = 0;
-        for(int i=0; i<boardSize; i++){
+        for (int i = 0; i < boardSize; i++) {
             TextView textView = new TextView(getApplicationContext());
             textView.setText(String.valueOf(i));
             textView.setHeight(dimension + marginOffset);
@@ -513,12 +479,12 @@ public class MainActivity extends AppCompatActivity {
 
             leftLabel.addView(textView);
 
-            marginOffset +=2;
+            marginOffset += 2;
         }
 
         //set top label
         marginOffset = 0;
-        for(int i=0; i<boardSize; i++){
+        for (int i = 0; i < boardSize; i++) {
             TextView textView = new TextView(getApplicationContext());
             textView.setText(String.valueOf(i));
             textView.setWidth(dimension + marginOffset);
@@ -529,16 +495,16 @@ public class MainActivity extends AppCompatActivity {
 
             topLabel.addView(textView);
 
-            marginOffset +=2;
+            marginOffset += 2;
         }
     }
 
-    public void decidePlayer(){
+    public void decidePlayer() {
 
         //Use Bundle to carry data to the fragment
         Bundle bundle = new Bundle();
-        Pair<Integer,Integer> blackPosition = game.getBoardObj().getFirstRemovedBlack();
-        Pair<Integer,Integer> whitePosition = game.getBoardObj().getFirstRemovedWhite();
+        Pair<Integer, Integer> blackPosition = game.getBoardObj().getFirstRemovedBlack();
+        Pair<Integer, Integer> whitePosition = game.getBoardObj().getFirstRemovedWhite();
 
         ArrayList<Integer> firstRemoved = new ArrayList<>();
 
@@ -548,12 +514,12 @@ public class MainActivity extends AppCompatActivity {
         firstRemoved.add(whitePosition.first);
         firstRemoved.add(whitePosition.second);
 
-        bundle.putIntegerArrayList("decidePlayer",firstRemoved);
+        bundle.putIntegerArrayList("decidePlayer", firstRemoved);
 
         //Run the FragmentDialogue to get user input
         DecideFirstTurnDialogueFragment decideFirstTurnDialogueFragment = new DecideFirstTurnDialogueFragment();
         decideFirstTurnDialogueFragment.setArguments(bundle);
-        decideFirstTurnDialogueFragment.show(fragmentManager,"Turn");
+        decideFirstTurnDialogueFragment.show(fragmentManager, "Turn");
     }
 
 
@@ -562,16 +528,13 @@ public class MainActivity extends AppCompatActivity {
             - Populates the grid with black and white stones
             - Sets tags for all those stones ("B" for black, "W" for white, "E" for Empty)
     */
-    public void initializeGame(int boardSize, Boolean createNewBoard)
-    {
+    public void initializeGame(int boardSize, Boolean createNewBoard) {
         //Initialize Game Class
-        if(createNewBoard == true)
+        if (createNewBoard == true)
             game = new Game(boardSize);
 
         //clear position map (necessary when loading)
         position_map.clear();
-
-
 
 
         GridLayout grid = findViewById(R.id.konane_grid);
@@ -586,24 +549,17 @@ public class MainActivity extends AppCompatActivity {
 
         //loop through the board array and initialize the grid layout with
         //appropriate color of stones
-        for(int row=0; row<game.getBoardObj().BOARD_SIZE; row++)
-        {
-            for(int col=0; col<game.getBoardObj().BOARD_SIZE; col++)
-            {
+        for (int row = 0; row < game.getBoardObj().BOARD_SIZE; row++) {
+            for (int col = 0; col < game.getBoardObj().BOARD_SIZE; col++) {
                 String stone = game.getBoardObj().BOARD[row][col];
                 //ImageView image = (ImageView) grid.getChildAt(child_index);
                 ImageView image = new ImageView(getApplicationContext());
 
-                if(stone.equals(game.getBoardObj().BLACK_STONE))
-                {
+                if (stone.equals(game.getBoardObj().BLACK_STONE)) {
                     image.setImageResource(R.drawable.black_stone);
-                }
-                else if(stone.equals(game.getBoardObj().WHITE_STONE))
-                {
+                } else if (stone.equals(game.getBoardObj().WHITE_STONE)) {
                     image.setImageResource(R.drawable.white_stone);
-                }
-                else if(stone.equals(game.getBoardObj().EMPTY_SPOT))
-                {
+                } else if (stone.equals(game.getBoardObj().EMPTY_SPOT)) {
                     image.setImageResource(0);
                 }
 
@@ -618,12 +574,11 @@ public class MainActivity extends AppCompatActivity {
                 image.setBackgroundColor(Color.WHITE);
 
 
-
                 //Put the Imageview ids and their equivalent locaiton in board array in position_map hashmap
                 //for O(1) reference
                 int _id = View.generateViewId();
                 image.setId(_id);
-                position_map.put(_id, new Pair<>(row,col));
+                position_map.put(_id, new Pair<>(row, col));
 
                 //All the ImaveViews need to be given tags based on the color of the stones they are given
                 image.setTag(game.getBoardObj().BOARD[row][col]);
@@ -644,12 +599,11 @@ public class MainActivity extends AppCompatActivity {
                 gparams.setGravity(Gravity.CENTER);
 
 
-
                 int margin = convertDpToPx(1);
-                gparams.setMargins(margin,margin,margin,margin);
+                gparams.setMargins(margin, margin, margin, margin);
 
 
-                grid.addView(image,gparams);
+                grid.addView(image, gparams);
             }
 
         }
@@ -677,18 +631,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*This function highlights active player in the TextView (User Interface)*/
-    void highlightPlayer(String player_color)
-    {
-        if(player_color == game.getBoardObj().BLACK_STONE)
-        {
+    void highlightPlayer(String player_color) {
+        if (player_color == game.getBoardObj().BLACK_STONE) {
             TextView player1_label = findViewById(R.id.player1_label);
             player1_label.setBackgroundColor(Color.parseColor("#FF8E3A"));
 
             TextView player2_label = findViewById(R.id.player2_label);
             player2_label.setBackgroundColor(Color.WHITE);
-        }
-        else if(player_color == game.getBoardObj().WHITE_STONE)
-        {
+        } else if (player_color == game.getBoardObj().WHITE_STONE) {
             TextView player2_label = findViewById(R.id.player2_label);
             player2_label.setBackgroundColor(Color.parseColor("#FF8E3A"));
 
@@ -711,7 +661,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         super.onOptionsItemSelected(item);
-        switch (item.getItemId()){
+        switch (item.getItemId()) {
             case R.id.saveGame:
                 saveGame();
                 break;
@@ -730,15 +680,16 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    public void onPlyAndPruneSet(int plyCutOff, Boolean isPrune){
-        Toast.makeText(getApplicationContext(), "Ply "+plyCutOff, Toast.LENGTH_SHORT).show();;
+    public void onPlyAndPruneSet(int plyCutOff, Boolean isPrune) {
+        Toast.makeText(getApplicationContext(), "Ply " + plyCutOff, Toast.LENGTH_SHORT).show();
+        game.setPly(plyCutOff);
     }
 
     /**
      * This function launches a Dialogue Fragment buiild on BoardSizeDialogueFragment Class.
      * The purpose of the fragment is to make the user pick board esize
      */
-    public void getBoardDimensions(){
+    public void getBoardDimensions() {
 
         boardSizeDialogueFragment = new BoardSizeDialogueFragment();
         boardSizeDialogueFragment.show(fragmentManager, "board size");
@@ -748,33 +699,34 @@ public class MainActivity extends AppCompatActivity {
      * This function will return the approximate stoneSize for a given boardSize
      * This is done in order to render all the stones in the screen realstate
      * (As the size of the board increase, the size of the stones have to decrease
-     *  for them all to fit on the screen)
-     *
-     *Size of the stone is calculated by an observation:
-     *Observation: When the board size is 6, stone size of 50dp is a perfect setup
-     *Conclusion: For a board size of n, stone size of (50dp*6)/n should be a perfect setup
+     * for them all to fit on the screen)
+     * <p>
+     * Size of the stone is calculated by an observation:
+     * Observation: When the board size is 6, stone size of 50dp is a perfect setup
+     * Conclusion: For a board size of n, stone size of (50dp*6)/n should be a perfect setup
      *
      * @param boardSize
      */
-    public int getStoneDimension(int boardSize){
+    public int getStoneDimension(int boardSize) {
 
         if (boardSize == 6)
             return convertDpToPx(50);
 
         else {
             int stoneSize = convertDpToPx(50);
-            return Math.round((stoneSize*6)/boardSize);
+            return Math.round((stoneSize * 6) / boardSize);
         }
 
     }
 
     /**
-     *This is a callback function trigged from the fragment class. Upon triggered,
+     * This is a callback function trigged from the fragment class. Upon triggered,
      * it initializes the game with the user picked board size
+     *
      * @param number
      */
-    public void onBoardSizePicked(String number){
-        Toast.makeText(getApplicationContext(),"Number "+number,Toast.LENGTH_SHORT).show();
+    public void onBoardSizePicked(String number) {
+        Toast.makeText(getApplicationContext(), "Number " + number, Toast.LENGTH_SHORT).show();
         initializeGame(Integer.parseInt(number), true);
 
         //A fragment thatf lets the player guess which of first two removed stones are black
@@ -782,10 +734,10 @@ public class MainActivity extends AppCompatActivity {
         decidePlayer();
     }
 
-    public void onPlayerDecided(Boolean isCorrectlyPicked){
+    public void onPlayerDecided(Boolean isCorrectlyPicked) {
         TextView player1_label = findViewById(R.id.player1_label);
         TextView player2_label = findViewById(R.id.player2_label);
-        if(isCorrectlyPicked == true){
+        if (isCorrectlyPicked == true) {
 
             //update the label on UI
             player1_label.setText("BLACK (H)");
@@ -795,9 +747,8 @@ public class MainActivity extends AppCompatActivity {
             game.player1.setComputer(false);
             game.player2.setComputer(true);
 
-            Toast.makeText(getApplicationContext(),"You are now BLACK Player",Toast.LENGTH_SHORT).show();
-        }
-        else{
+            Toast.makeText(getApplicationContext(), "You are now BLACK Player", Toast.LENGTH_SHORT).show();
+        } else {
 
             //update the label on UI
             player1_label.setText("BLACK (AI)");
@@ -807,7 +758,12 @@ public class MainActivity extends AppCompatActivity {
             game.player1.setComputer(true);
             game.player2.setComputer(false);
 
-            Toast.makeText(getApplicationContext(),"You are now WHITE Player",Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), "You are now WHITE Player", Toast.LENGTH_SHORT).show();
+        }
+
+        //If the current Player is computer, we need to make suggestions
+        if(game.activePlayer.isComputer() == true){
+            generateMinMaxMoves();
         }
     }
 
@@ -815,25 +771,136 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if(requestCode == EXTERNAL_STORAGE_WRITE_PERMISSION_CODE){
-            if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+        if (requestCode == EXTERNAL_STORAGE_WRITE_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 saveGame();
-            }
-            else{
+            } else {
                 makeToast("Sorry, can't load file");
             }
         }
     }
 
-    void minimaxCallback(TravelPath bestPath){
-        System.out.println(bestPath.toString());
-        System.out.println("minimax value "+bestPath.getMiniMaxValue());
-        System.out.println("__________");
+    public void generateMinMaxMoves() {
+        MiniMaxAlgorithmTask mtask = new MiniMaxAlgorithmTask();
+        mtask.execute(game.activePlayer);
+    }
+
+    //showing human move is a little different from showing AI move
+    //in human move, all the moves need to be shown consecutively
+    public void showHumanMove(){
+
+        if(possibleMoves.isEmpty()){
+            makeToast("No more hints available");
+            hintNumber = 0;
+            return;
+        }
+
+        if(hintNumber == 0){
+            Cell source = possibleMoves.poll();
+            sourceBlink = findViewById(getId(source.getRow(), source.getCol()));
+            hintNumber++;
+        }
+
+        Cell dest = possibleMoves.poll();
+        destBlink = findViewById(getId(dest.getRow(), dest.getCol()));
+
+        blinkEffect();
+
+    }
+
+    /*Display AI moves by blinking*/
+    public void showAIMoves() {
+        TravelPath travelPath = game.getMinMaxTravelPath();
+
+        for (Cell cell : travelPath.getPath()) {
+
+            int cellImaveViewId = getId(cell.getRow(), cell.getCol());
+            ImageView cellImaveView = findViewById(cellImaveViewId);
+
+            Animation cellAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
+            cellImaveView.startAnimation(cellAnimation);
+        }
 
         Button AIPermissionButton = findViewById(R.id.AIPermissionButton);
         AIPermissionButton.setVisibility(View.VISIBLE);
+    }
+
+    public void hideAIMoves(TravelPath travelPath) {
+
+        for (Cell cell : travelPath.getPath()) {
+
+            int cellImaveViewId = getId(cell.getRow(), cell.getCol());
+            ImageView cellImaveView = findViewById(cellImaveViewId);
+
+            cellImaveView.setAnimation(null);
+        }
+
+        Button AIPermissionButton = findViewById(R.id.AIPermissionButton);
+        AIPermissionButton.setVisibility(View.INVISIBLE);
 
     }
+
+    /*This function makes move for AI*/
+    public void moveAI(View view) {
+
+        TravelPath travelPath = game.getMinMaxTravelPath();
+
+        //first clear the animation that shows AI path
+        hideAIMoves(travelPath);
+
+        //then make equivalent move on the board
+        ArrayList<Cell> middlePositions = game.move(travelPath);
+
+        //Now make same move in the user interface board
+        int sourceId = getId(travelPath.getSource().getRow(), travelPath.getSource().getCol());
+        int destId = getId(travelPath.getDestination().getRow(), travelPath.getDestination().getCol());
+
+        ImageView source = findViewById(sourceId);
+        ImageView dest = findViewById(destId);
+
+
+        setImageResource(destId, source.getTag().toString());
+
+        //Now empty the source
+        source.setImageResource(0);
+        source.setTag(game.getBoardObj().EMPTY_SPOT);
+
+        System.out.println("#########"+middlePositions);
+
+        //Now empty the middle positions
+        for(Cell middlePos: middlePositions){
+            ImageView imageView = findViewById(getId(middlePos.getRow(), middlePos.getCol()));
+            imageView.setImageResource(0);
+            imageView.setTag(game.getBoardObj().EMPTY_SPOT);
+        }
+
+
+        game.getBoardObj().printTable();
+
+        int score = game.getMinMaxTravelPath().getScore();
+        game.activePlayer.setScore(game.activePlayer.getScore()+score);
+        updateScore(false);
+        switchPlayer();
+    }
+
+    public void setImageResource(int imageViewId, String tag){
+
+        ImageView imageView = findViewById(imageViewId);
+        if(tag.equals(game.getBoardObj().BLACK_STONE)){
+            imageView.setImageResource(R.drawable.black_stone);
+            imageView.setTag(game.getBoardObj().BLACK_STONE);
+        }
+        else if(tag.equals(game.getBoardObj().WHITE_STONE)){
+            imageView.setImageResource(R.drawable.white_stone);
+            imageView.setTag(game.getBoardObj().WHITE_STONE);
+        }
+        else if(tag.equals(game.getBoardObj().EMPTY_SPOT)){
+            imageView.setImageResource(0);
+            imageView.setTag(game.getBoardObj().EMPTY_SPOT);
+        }
+
+    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -848,22 +915,36 @@ public class MainActivity extends AppCompatActivity {
      * Minmax algorithm takes a long time to execute. Trying to run the algorithm within any view functions
      * throws badtokenException. Running the algorithm in background in each user's turn is a better alternative.
      */
-    public class MiniMaxAlgorithmTask extends AsyncTask<Player, Void, TravelPath>{
+    public class MiniMaxAlgorithmTask extends AsyncTask<Player, Void, TravelPath> {
 
         @Override
         protected TravelPath doInBackground(Player... players) {
-            game.callMinimax(3, 0, game.player2);
+            game.callMinimax(game.activePlayer);
             TravelPath bestPath = game.getBestMove();
 
             return bestPath;
         }
 
         @Override
-        protected void onPostExecute(TravelPath travelPath) {
-            super.onPostExecute(travelPath);
-            minimaxCallback(travelPath);
+        protected void onPostExecute(TravelPath bestPath) {
+            super.onPostExecute(bestPath);
+            if(game.activePlayer.isComputer()) {
+                game.setMinMaxTravelPath(bestPath);
+                showAIMoves();
+            }else{
+                game.setMinMaxTravelPath(bestPath);
+
+                System.out.println("travelpath: "+bestPath);
+                for(Cell cell: bestPath.getPath()){
+                    possibleMoves.add(cell);
+                }
+                showHumanMove();
+            }
         }
     }
+
+
+
 }
 
 

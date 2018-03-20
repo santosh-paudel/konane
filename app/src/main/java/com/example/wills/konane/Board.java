@@ -165,11 +165,9 @@ public class Board {
                             middle_pos[0] = new Cell(source.getRow(), source.getCol()+1, EMPTY_SPOT);
                             swappable = true;
                         }
-
                     }
                     else
                     {
-
                         if(BOARD[source.getRow()][source.getCol()-1].equals(EMPTY_SPOT) == false){
                             BOARD[source.getRow()][source.getCol()-1] = EMPTY_SPOT;
                             middle_pos[0] = new Cell(source.getRow(), source.getCol()-1, EMPTY_SPOT);
@@ -419,7 +417,7 @@ public class Board {
 
         //If it's possible to move to the right, get the coordinate to the right
         if(cell.getCol()+2 < BOARD_SIZE && BOARD[cell.getRow()][cell.getCol()+2].equals(EMPTY_SPOT) && !BOARD[cell.getRow()][cell.getCol()+1].equals(EMPTY_SPOT)) {
-            east = new Cell(cell.getRow(), cell.getCol()+2, cell.getColor());
+            east = new Cell(cell.getRow(), cell.getCol()+2, EMPTY_SPOT);
             return east;
         }
 
@@ -431,7 +429,7 @@ public class Board {
         Cell south;
         //If it's possible to move to the top, get the coordinate to the top
         if (cell.getRow() + 2 < BOARD_SIZE && BOARD[cell.getRow() + 2][cell.getCol()].equals(EMPTY_SPOT) && !BOARD[cell.getRow() + 1][cell.getCol()].equals(EMPTY_SPOT)) {
-            south = new Cell(cell.getRow() + 2, cell.getCol(), cell.getColor());
+            south = new Cell(cell.getRow() + 2, cell.getCol(), EMPTY_SPOT);
             return south;
         }
         return null;
@@ -443,7 +441,7 @@ public class Board {
 
         //If it's possible to move to the right, get the coordinates to the right
         if(cell.getCol()-2 >= 0 && BOARD[cell.getRow()][cell.getCol()-2].equals(EMPTY_SPOT) && !BOARD[cell.getRow()][cell.getCol()-1].equals(EMPTY_SPOT)) {
-            west = new Cell(cell.getRow(), cell.getCol()-2, cell.getColor());
+            west = new Cell(cell.getRow(), cell.getCol()-2, EMPTY_SPOT);
             return west;
         }
         return null;
@@ -453,7 +451,7 @@ public class Board {
     {
         Cell north;
         if(cell.getRow()-2 >= 0 && BOARD[cell.getRow()-2][cell.getCol()].equals(EMPTY_SPOT) && !BOARD[cell.getRow()-1][cell.getCol()].equals(EMPTY_SPOT)) {
-            north = new Cell(cell.getRow()-2, cell.getCol(), cell.getColor());
+            north = new Cell(cell.getRow()-2, cell.getCol(), EMPTY_SPOT);
             return north;
         }
         return null;

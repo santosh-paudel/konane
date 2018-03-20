@@ -68,4 +68,11 @@ public class Cell implements Comparable<Cell>{
             return true;
         return false;
     }
+
+    @Override
+    public String toString() {
+        super.toString();
+
+        return this.getRow()+","+this.getCol()+" Color: "+this.getColor();
+    }
 }
