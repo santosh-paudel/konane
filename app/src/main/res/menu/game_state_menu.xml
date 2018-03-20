@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:title="Save Game"
+          android:id="@+id/saveGame"></item>
+    <item android:title="Load From File"
+          android:id="@+id/loadFromFile"></item>
+    <item android:id="@+id/settings"
+        android:title="settings"
+        android:icon="@drawable/settings"
+        app:showAsAction="always"/>
+</menu>

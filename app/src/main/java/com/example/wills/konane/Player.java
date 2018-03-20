@@ -13,18 +13,26 @@ public class Player {
 
     //player id is necessary for UI manipulation
     private int player_id; //all players have unique id's
-    private boolean isActive;
     private int score = 0;
     private String stone_color; //the stone color that the player picked
     private Boolean hasWon = false;
     private String name;
+    private Boolean isComputer;
+
 
     //constructor
     Player(boolean active, String color, String player_name) {
 
-        isActive = active;
         stone_color = color;
         name = player_name;
+    }
+
+    public void setComputer(Boolean computer) {
+        isComputer = computer;
+    }
+
+    public Boolean isComputer() {
+        return isComputer;
     }
 
     //get player's name
@@ -47,6 +55,11 @@ public class Player {
         return stone_color;
     }
 
+    /**
+     * This function returns if the player has any valid moves based on the color of the stone
+     * @param board
+     * @return
+     */
     public boolean hasValidMove (Board board)
     {
         return board.hasMoves(stone_color);
@@ -65,10 +78,18 @@ public class Player {
 
     public void setWinner(Boolean winningState) {hasWon = winningState;}
 
-    public Boolean isWinner(){ return hasWon;}
-
     public void setId(int id){player_id = id;}
 
     public int getId(){return player_id;}
 
+    @Override
+    public boolean equals(Object obj) {
+        super.equals(obj);
+
+        Player player_obj = (Player) obj;
+        if(this.getColor().equals(player_obj.getColor()))
+            return true;
+
+        return false;
+    }
 }

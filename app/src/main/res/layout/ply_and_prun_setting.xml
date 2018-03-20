@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/ply_and_prun_setting_layout"
+    android:layout_width="200dp"
+    android:layout_height="250dp"
+    android:layout_gravity="center"
+    android:gravity="center">
+
+
+    <EditText
+        android:id="@+id/plyCutOffPlainText"
+        android:layout_width="170dp"
+        android:layout_height="50dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:gravity="center"
+        android:hint="Ply Cut Off" />
+
+    <CheckBox
+        android:id="@+id/alphaBetaCheckBox"
+        android:layout_width="170dp"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@+id/plyCutOffPlainText"
+        android:layout_below="@+id/plyCutOffPlainText"
+        android:layout_marginTop="15dp"
+        android:text="Use Alpha Beta Pruning" />
+</RelativeLayout>
