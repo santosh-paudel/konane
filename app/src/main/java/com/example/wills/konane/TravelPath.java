@@ -1,16 +1,19 @@
 package com.example.wills.konane;
 
+import android.support.annotation.NonNull;
+
 import java.util.ArrayList;
 
 /**
  * Created by coffee on 3/18/18.
  */
 
-public class TravelPath {
+public class TravelPath implements Comparable<TravelPath>{
     private Cell source;
     private Cell destination;
     private int score;
     private int miniMaxValue;
+
     ArrayList<Cell> path = new ArrayList<>();
 
     TravelPath(Cell source, Cell destination){
@@ -55,13 +58,32 @@ public class TravelPath {
     @Override
     public String toString() {
         super.toString();
-        String path = "";
+        String path = "(";
         if(this.getPath().size() != 0){
             for(Cell cell: this.getPath()){
                 path += cell.getRow()+","+cell.getCol()+" -> ";
             }
         }
+        path+=")";
 
         return path;
     }
+
+    @Override
+    public int compareTo(@NonNull TravelPath o) {
+        if(this.getScore() > o.getScore())
+            return 1;
+        if(this.getScore() < o.getScore())
+            return -1;
+        return 0;
+    }
+
+    /**This function returns which colored stone is being moved in the current
+     * travelpath. It is always the color of the source that matters
+     * @return
+     */
+    public String getCurrentColor(){
+        return source.getColor();
+    }
+
 }

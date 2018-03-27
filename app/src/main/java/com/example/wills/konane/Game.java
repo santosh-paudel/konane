@@ -1,8 +1,10 @@
 package com.example.wills.konane;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Environment;
+import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.util.Pair;
 
 import java.io.BufferedReader;
@@ -18,6 +20,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Stack;
+import java.util.concurrent.TimeUnit;
+
+import static java.util.Collections.max;
+import static java.util.Collections.min;
 
 
 /**
@@ -32,13 +38,33 @@ public class Game {
     public Player activePlayer = player1;
     private Boolean game_over = false;
     private int minimaxPly = 2;
+    private long algorithmExecutionTime = 0;
     private TravelPath minMaxTravelPath = null;
+    private Boolean useAlphaBetaPruning = false;
+
+    private int player1MinimaxScore = 0;
+    private int player2MinimaxScore = 0;
+
+
+    HashMap<Integer, ArrayList<TravelPath>> movesAtEachDepth= new HashMap<>();
 
     public ArrayList<TravelPath> minMaxRootValues = new ArrayList<>();
 
     Game(int boardSize){
 
         board = new Board(boardSize);
+    }
+
+    public void setAlphaBetaPruning(Boolean useABP){
+        if(useABP == true){
+            useAlphaBetaPruning = true;
+        }else{
+            useAlphaBetaPruning = false;
+        }
+    }
+
+    public boolean getAlphaBetaPruning(){
+        return useAlphaBetaPruning;
     }
 
     public TravelPath getMinMaxTravelPath(){
@@ -65,6 +91,10 @@ public class Game {
             return true;
         }
         return false;
+    }
+
+    public long getMinimaxExecutionTime(){
+        return algorithmExecutionTime;
     }
 
 
@@ -385,9 +415,6 @@ public class Game {
             bufferedWriter.write(player2.getName()+": "+player2.getScore());
             bufferedWriter.newLine();
 
-            bufferedWriter.write("board size: "+board.BOARD_SIZE);
-            bufferedWriter.newLine();
-
             bufferedWriter.write("Board:");
             bufferedWriter.newLine();
 
@@ -428,6 +455,10 @@ public class Game {
     }
 
     public Boolean loadGameFromFile(Context context, Uri uri) {
+
+        Boolean boardSizeFound = false; //this flag will be used to pick board size
+        //Initially board size will be maximum. But we will reassign the board size once we find the grid on the textfile
+        int boardSize = 100;
         InputStream inputStream = null;
         Boolean successful_load = false;
         try {
@@ -444,21 +475,24 @@ public class Game {
 
                 if(buffer == null)
                     break;
-
+                //ignore line_counter 3 (we don't have anything to do with Board: )
                 if (line_counter == 0 || line_counter == 1)
                 {
                     if(line_counter == 0)
                         player1.setScore(Integer.parseInt(buffer.split(": ")[1]));
                     else if(line_counter == 1)
                         player2.setScore(Integer.parseInt(buffer.split(": ")[1]));
+
                 }
-                else if(line_counter == 2){
-                    board.BOARD_SIZE = Integer.parseInt(buffer.split(": ")[1]);
-                }
-                //ignore line_counter 3 (we don't have anything to do with Board: )
-                else if(line_counter > 3 && line_counter <= 3+board.BOARD_SIZE)
+                else if(line_counter > 2 && line_counter <= 2+boardSize)
                 {
                     String[] row = buffer.split(" ");
+                    if(boardSizeFound == false) {
+                        boardSize = row.length;
+                        board.BOARD_SIZE = boardSize;
+                        boardSizeFound = true;
+                    }
+                    board.BOARD_SIZE = boardSize;
                     for(int i=0; i<board.BOARD_SIZE; i++)
                     {
                         if (row[i].equals("O"))
@@ -468,20 +502,25 @@ public class Game {
                     rowNum++;
                 }
 
-                if(line_counter == 3+board.BOARD_SIZE+1)
+                if(line_counter == 2+board.BOARD_SIZE+1)
                 {
                     String playerName = buffer.split(": ")[1].trim();
-                    if(playerName.equals("Black")){
+                    if(playerName.equals(player1.getName())){
                         activePlayer = player1;}
-                    else
+                    else {
                         activePlayer = player2;
+                    }
                 }
-                if(line_counter == 3+board.BOARD_SIZE+1){
+                if(line_counter == 2+board.BOARD_SIZE+2){
                     String human = buffer.split(":")[1].trim();
                     if(human.equals(player1.getName())){
                         player2.setComputer(true);
-                    }else
+                        player1.setComputer(false);
+                    }
+                    else {
                         player1.setComputer(true);
+                        player2.setComputer(false);
+                    }
                 }
                 line_counter++;
             }
@@ -508,75 +547,105 @@ public class Game {
         return null;
     }
 
+    public void resetMinimaxDependencies(){
 
-    public void callMinimax(Player currentPlayer){
+        algorithmExecutionTime = 0;
         minMaxTravelPath = null;
         minMaxRootValues.clear();
-        int score;
+        movesAtEachDepth.clear();
+        player1MinimaxScore = 0;
+        player2MinimaxScore = 0;
+    }
 
-        if(currentPlayer.getColor().equals(board.WHITE_STONE)) {
-            System.out.println("####### "+" calling minimax for "+currentPlayer.getName());
-            score = minimaxPlayer2(0, currentPlayer);
+    public int getPlayer1MinimaxScore(){
+        return player1MinimaxScore;
+    }
+
+    public int getPlayer2MinimaxScore(){
+        return player2MinimaxScore;
+    }
+
+    public void calculatePlyScores(Player currentPlayer) {
+
+        TravelPath bestMove = getBestMove();
+        if (bestMove != null) {
+            ArrayList<TravelPath> bestMoves = new ArrayList();
+            int bestScore = bestMove.getMiniMaxValue();
+            //bestMoves.add(bestMove);
+
+            System.out.println("Best move: " + bestMove + "Minimax Value: " + bestMove.getMiniMaxValue());
+            for (int i = 0; i <= minimaxPly; i++) {
+                if(movesAtEachDepth.containsKey(i)) {
+                    for (TravelPath moves : movesAtEachDepth.get(i)) {
+                        if (moves.getMiniMaxValue() == bestScore) {
+                            System.out.println(moves + " Depth " + i + " Score " + moves.getScore());
+                            bestMoves.add(moves);
+                            break;
+                        }
+                    }
+                }
+            }
         }
-        else {
-            System.out.println("####### "+" calling minimax for "+currentPlayer.getName());
-            score = minimaxPlayer1(0, currentPlayer);
+    }
+
+
+
+
+    /**
+     * This function calls Minimax algorithm and return executing time
+     * @param currentPlayer
+     * @return
+     */
+    public void miniMaxAlgorithm(Player currentPlayer){
+
+        resetMinimaxDependencies();
+        //startTime for Minimax algorithm
+        long startTime = System.currentTimeMillis();
+
+
+        if(getAlphaBetaPruning() == false){
+            System.out.println("Using minmax");
+            minimax(0, currentPlayer, currentPlayer, 0,0);
+
+        } else{
+            System.out.println("Using alpha beta prunning");
+            alphaBetaPruning(0, currentPlayer, currentPlayer, Integer.MIN_VALUE, Integer.MAX_VALUE, 0, 0);
         }
+
+        calculatePlyScores(currentPlayer);
+
+        //stop time for minimax algorithm
+        long stopTime = System.currentTimeMillis();
+        algorithmExecutionTime = stopTime - startTime;
 
         minMaxTravelPath = getBestMove();
-
-
     }
 
-    public TravelPath getBestMove(){
-        if(minMaxRootValues.size() > 0) {
-            TravelPath t = minMaxRootValues.get(0);
-            int max_score = t.getScore();
-            for (TravelPath tp : minMaxRootValues) {
-                if (tp.getScore() > max_score) {
-                    t = tp;
-                    max_score = t.getScore();
-                }
-            }
-
-            return t;
-        }
-        return null;
-    }
-
-    //This min max favors player2. needs changes. read comment
-    public int minimaxPlayer2(int depth,  Player currentPlayer){
+    public int minimax(int depth,  Player currentPlayer, Player favoritePlayer, int favoritePlayerScore, int opponentScore){
 
         System.out.println("Depth "+depth);
-        //board.printTable();
 
         //if current player is winning return 1
-        if (getWinner() != null && getWinner().equals(currentPlayer)) {
-            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return 1");
+        if (getWinner() != null && getWinner().equals(favoritePlayer)) {
             return 1;
         }
+
         //if current player is not winning return -1
-        if (getWinner() != null && getWinner().equals(currentPlayer) == false) {
-            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return -1");
+        if (getWinner() != null && getWinner().equals(favoritePlayer) == false) {
             return -1;
         }
 
-        if (depth > minimaxPly){
-            int minHeuristic = getMinMaxHeuristic(player2.getName());
-            //System.out.println("Min Heuristic "+minHeuristic);
-            return minHeuristic;
+        if (depth >= minimaxPly){
+            int heuristic = favoritePlayerScore - opponentScore;
+            return heuristic;
         }
-
 
         ArrayList<TravelPath> availableMoves = getAllPossibleMoves(currentPlayer.getColor());
         if (availableMoves.isEmpty())
         {
-            //System.out.println("No available moves");
             return 0;
         }
 
-
-        ArrayList<Integer> scores = new ArrayList<>();
 
         //Each recursion is a new change in game state. After coming
         //back from the recursion, we need to restore the game state's to it's
@@ -588,164 +657,154 @@ public class Game {
         if(minimaxPly >= depth) {
             //copy board to restorePointBoard array
             board.makeCopy(restorePointBoard);
-            //System.out.println("Saving restore point: ");
         }
 
-        for (int i = 0; i < availableMoves.size(); i++) {
-
-            TravelPath point = availableMoves.get(i);
-            //System.out.println("Point: "+point);
-
-            //change this line to currentPlayer.isComputer() later
-            if (currentPlayer.equals(player2)) {
-                //System.out.println("Moving player 2 "+point);
-                move(point);
-
-                int currentScore = minimaxPlayer2(depth+1, player1);
-                //System.out.println("current Score player 1: "+currentScore);
-                scores.add(currentScore);
-                //System.out.println("Scores: "+scores.toString());
-
-                if(depth == 0){
-                    //System.out.println("Depth 0 point "+point);
-                    point.setMiniMaxValue(currentScore);
-                    minMaxRootValues.add(point);
-                }
-            }else if(currentPlayer.equals(player1)){
-                move(point);
-                //System.out.println("Moving player1 "+point);
-                int currentScore = minimaxPlayer2(depth+1, player2);
-                //System.out.println("current Score player 2: "+currentScore);
-
-                scores.add(currentScore);
-
-                //System.out.println("Scores: "+scores.toString());
-            }
-            board.restoreBoard(restorePointBoard);
-            //System.out.println("Board Restored: ");
-        }
-
-        if(currentPlayer.equals(player2)){
-            return Collections.max(scores);
-        }
-        return Collections.min(scores);
-    }
-
-    public int minimaxPlayer1(int depth,  Player currentPlayer){
-
-        System.out.println("Depth "+depth);
-        //board.printTable();
-
-        //if current player is winning return 1
-        if (getWinner() != null && getWinner().equals(currentPlayer)) {
-            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return 1");
-            return 1;
-        }
-        //if current player is not winning return -1
-        if (getWinner() != null && getWinner().equals(currentPlayer) == false) {
-            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return -1");
-            return -1;
-        }
-
-        if (depth > minimaxPly){
-            int minHeuristic = getMinMaxHeuristic(player1.getName());
-            //System.out.println("Min Heuristic "+minHeuristic);
-            return minHeuristic;
-        }
-
-
-        ArrayList<TravelPath> availableMoves = getAllPossibleMoves(currentPlayer.getColor());
-        if (availableMoves.isEmpty())
-        {
-            //System.out.println("No available moves");
-            return 0;
-        }
-
-
+        ArrayList<TravelPath> tempMoves = new ArrayList<>();
         ArrayList<Integer> scores = new ArrayList<>();
 
-        //Each recursion is a new change in game state. After coming
-        //back from the recursion, we need to restore the game state's to it's
-        //original state. Hence, we need to copy the board
-        String[][] restorePointBoard = new String[board.BOARD_SIZE][board.BOARD_SIZE];
-
-        //I'm not sure why this condition has to be checked. This seems to work after stepping through the debugger several hundred times
-        //Any answers will be awarded a million dollars
-        if(minimaxPly >= depth) {
-            //copy board to restorePointBoard array
-            board.makeCopy(restorePointBoard);
-            //System.out.println("Saving restore point: ");
-        }
 
         for (int i = 0; i < availableMoves.size(); i++) {
 
             TravelPath point = availableMoves.get(i);
-            //System.out.println("Point: "+point);
+            tempMoves.add(point);
 
             //change this line to currentPlayer.isComputer() later
-            if (currentPlayer.equals(player1)) {
-                //System.out.println("Moving player 2 "+point);
+            if (currentPlayer.equals(favoritePlayer)) {
                 move(point);
 
-                int currentScore = minimaxPlayer2(depth+1, player2);
+                int currentScore = minimax(depth+1, getAlternatePlayer(currentPlayer), favoritePlayer, favoritePlayerScore+point.getScore(), opponentScore);
                 //System.out.println("current Score player 1: "+currentScore);
                 scores.add(currentScore);
-                //System.out.println("Scores: "+scores.toString());
+                point.setMiniMaxValue(currentScore);
 
                 if(depth == 0){
-                    //System.out.println("Depth 0 point "+point);
-                    point.setMiniMaxValue(currentScore);
                     minMaxRootValues.add(point);
                 }
-            }else if(currentPlayer.equals(player2)){
+            }else if(!currentPlayer.equals(favoritePlayer)){
                 move(point);
-                //System.out.println("Moving player1 "+point);
-                int currentScore = minimaxPlayer1(depth+1, player1);
-                //System.out.println("current Score player 2: "+currentScore);
+                int currentScore = minimax(depth+1, getAlternatePlayer(currentPlayer), favoritePlayer, favoritePlayerScore, opponentScore+point.getScore());
 
+                point.setMiniMaxValue(currentScore);
                 scores.add(currentScore);
 
-                //System.out.println("Scores: "+scores.toString());
             }
             board.restoreBoard(restorePointBoard);
-            //System.out.println("Board Restored: ");
         }
 
-        if(currentPlayer.equals(player1)){
-            return Collections.max(scores);
-        }
-        return Collections.min(scores);
-    }
 
-
-
-    //Utility function for minimax Algorithm that calculates
-    //it favors player2 (read minimax comments to fix this)
-    public int getMinMaxHeuristic(String favor){
-        //Get all the possible moves of player1
-        ArrayList<TravelPath> travelPathsPlayer1 = getAllPossibleMoves(player1.getColor());
-        int player1MaxScore = Integer.MIN_VALUE;
-        for(TravelPath t: travelPathsPlayer1){
-            if(t.getScore() > player1MaxScore)
-                player1MaxScore = t.getScore();
-        }
-
-        //System.out.println(player1.getName()+" Heuristic "+player1MaxScore);
-
-        //Get all the possible moves of player2
-        ArrayList<TravelPath> travelPathsPlayer2 = getAllPossibleMoves(player2.getColor());
-        int player2MaxScore = Integer.MIN_VALUE;
-        for(TravelPath t: travelPathsPlayer2){
-            if(t.getScore() > player2MaxScore)
-                player2MaxScore = t.getScore();
-        }
-
-        //System.out.println(player2.getName()+" Heuristic "+player1MaxScore);
-        if(favor.equals(player2.getName())) {
-            return player2MaxScore - player1MaxScore;
+        if(movesAtEachDepth.containsKey(depth)){
+            movesAtEachDepth.get(depth).addAll(tempMoves);
         }else{
-            return player1MaxScore - player2MaxScore;
+            movesAtEachDepth.put(depth,tempMoves);
         }
+
+        if(currentPlayer.equals(favoritePlayer)){
+            return max(scores);
+        }
+
+        return min(scores);
+    }
+
+
+    public int alphaBetaPruning(int depth, Player currentPlayer, Player favoritePlayer, int alpha, int beta, int favoritePlayerScore, int opponentScore){
+        System.out.println("Depth Alfa beta"+depth);
+        //board.printTable();
+
+        //if current player is winning return 1
+        if (getWinner() != null && getWinner().equals(favoritePlayer)) {
+            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return 1");
+            return 1;
+        }
+        //if current player is not winning return -1
+        if (getWinner() != null && getWinner().equals(favoritePlayer) == false) {
+            //System.out.println(currentPlayer.getName()+"("+currentPlayer.getColor()+") " +" return -1");
+            return -1;
+        }
+
+        if (depth >= minimaxPly){
+            int heuristic = favoritePlayerScore - opponentScore;
+            //System.out.println("Min Heuristic "+minHeuristic);
+            return heuristic;
+        }
+
+
+        ArrayList<TravelPath> availableMoves = getAllPossibleMoves(currentPlayer.getColor());
+        if (availableMoves.isEmpty())
+        {
+            //System.out.println("No available moves");
+            return 0;
+        }
+
+
+        //Each recursion is a new change in game state. After coming
+        //back from the recursion, we need to restore the game state's to it's
+        //original state. Hence, we need to copy the board
+        String[][] restorePointBoard = new String[board.BOARD_SIZE][board.BOARD_SIZE];
+
+        //I'm not sure why this condition has to be checked. This seems to work after stepping through the debugger several hundred times
+        //Any answers will be awarded a million dollars
+        if(minimaxPly >= depth) {
+            //copy board to restorePointBoard array
+            board.makeCopy(restorePointBoard);
+            //System.out.println("Saving restore point: ");
+        }
+
+        int tempAlpha = Integer.MIN_VALUE;
+        int tempBeta = Integer.MAX_VALUE;
+        ArrayList<TravelPath> tempMoves = new ArrayList<>();
+        ArrayList<Integer> scores = new ArrayList<>();
+
+        for (int i = 0; i < availableMoves.size(); i++) {
+
+            TravelPath point = availableMoves.get(i);
+            //System.out.println("Point: "+point);
+
+            //change this line to currentPlayer.isComputer() later
+            if (currentPlayer.equals(favoritePlayer)) {
+                //System.out.println("Moving player 2 "+point);
+                move(point);
+
+                int currentScore = alphaBetaPruning(depth+1, getAlternatePlayer(currentPlayer), favoritePlayer, alpha, beta, favoritePlayerScore+point.getScore(), opponentScore);
+
+                tempAlpha = Math.max(tempAlpha, currentScore);
+
+                alpha = Math.max(alpha, tempAlpha);
+
+
+                if(depth == 0) {
+                    //System.out.println("Depth 0 point "+point);
+                    point.setMiniMaxValue(currentScore);
+                    minMaxRootValues.add(point);
+                }
+
+                if(beta <= alpha)
+                    break;
+
+            }
+            else if(!currentPlayer.equals(favoritePlayer)){
+                move(point);
+
+                //System.out.println("Moving player1 "+point);
+                int currentScore = alphaBetaPruning(depth+1, getAlternatePlayer(currentPlayer), favoritePlayer,alpha,beta, favoritePlayerScore, opponentScore+point.getScore());
+                //System.out.println("current Score player 2: "+currentScore);
+
+                tempBeta = Math.min(tempBeta, currentScore);
+                beta = Math.min(tempBeta, beta);
+
+                if(beta <= alpha)
+                   break;
+
+                //System.out.println("Scores: "+scores.toString());
+            }
+            board.restoreBoard(restorePointBoard);
+            //System.out.println("Board Restored: ");
+        }
+
+        if(currentPlayer.equals(favoritePlayer)){
+            return tempAlpha;
+        }
+
+        return tempBeta;
     }
 
     /*Utility function for minimax algorithm and MainActivity
@@ -775,6 +834,33 @@ public class Game {
         }
 
         return middleCells;
+    }
+
+
+    public TravelPath getBestMove(){
+
+        int minmaxValue = Integer.MIN_VALUE;
+        TravelPath bestMove = null;
+
+        for(TravelPath t: minMaxRootValues){
+            if(t.getMiniMaxValue() > minmaxValue){
+                bestMove = t;
+                minmaxValue = t.getMiniMaxValue();
+            }
+        }
+
+        return bestMove;
+    }
+
+    /**
+     * This is a utility function that returns alternate player
+     * @param player
+     * @return
+     */
+    Player getAlternatePlayer(Player player){
+        if(player.getName().equals(player1.getName()))
+            return player2;
+        return player1;
     }
 
 }

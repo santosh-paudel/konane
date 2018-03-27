@@ -196,5 +196,52 @@
         app:layout_constraintStart_toEndOf="@+id/hint"
         app:layout_constraintTop_toBottomOf="@+id/player2_score" />
 
+    <TextView
+        android:id="@+id/executionTimeTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="5dp"
+        android:text="Time: 0"
+        app:layout_constraintBottom_toTopOf="@+id/gridLabelTop"
+        app:layout_constraintEnd_toStartOf="@+id/hint"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/player1_score"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <TextView
+        android:id="@+id/player1PlyMinmaxTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="8dp"
+        android:text="TextView"
+        android:textSize="9sp"
+        app:layout_constraintEnd_toStartOf="@+id/hint"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/executionTimeTextView"
+        tools:text="Player1 Minmax Score:" />
+
+    <TextView
+        android:id="@+id/player2MinmaxTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginTop="5dp"
+        android:text="Player2 Minmax Score: "
+        android:textSize="9sp"
+        app:layout_constraintBottom_toTopOf="@+id/gridLabelTop"
+        app:layout_constraintEnd_toStartOf="@+id/hint"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/player1PlyMinmaxTextView"
+        app:layout_constraintVertical_bias="0.0" />
+
 
 </android.support.constraint.ConstraintLayout>
