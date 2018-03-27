@@ -228,6 +228,7 @@ public class MainActivity extends AppCompatActivity {
     public void resetHints() {
         hintNumber = 0;
         possibleMoves.clear();
+        userHintAsked = false;
 
         //clear blinking effect if there are any
         clearBlinkEffect();
@@ -712,6 +713,15 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), "Ply: " + plyCutOff+" "+" and Prune: "+isPrune.toString(), Toast.LENGTH_SHORT).show();
         game.setPly(plyCutOff);
         game.setAlphaBetaPruning(isPrune);
+
+        if(game.activePlayer.isComputer() == false){
+            resetHints();
+        }else
+        {
+            hideAIMoves(game.getMinMaxTravelPath());
+            generateMinMaxMoves();
+        }
+        System.out.println("New Moves Generated");
     }
 
     /**
@@ -836,6 +846,12 @@ public class MainActivity extends AppCompatActivity {
         {
             executionTimeTextView.setText("Time: "+0+"ms");
         }
+
+        TextView player1MinmaxTextView = findViewById(R.id.player1PlyMinmaxTextView);
+        TextView player2MinmaxTextView = findViewById(R.id.player2MinmaxTextView);
+
+        player1MinmaxTextView.setText(game.player1.getName()+" Minmax score: "+game.getPlayer1MinimaxScore());
+        player2MinmaxTextView.setText(game.player2.getName()+" Minmax score: "+game.getPlayer2MinimaxScore());
     }
 
     public void generateMinMaxMoves() {
@@ -952,8 +968,6 @@ public class MainActivity extends AppCompatActivity {
             imageView.setTag(game.getBoardObj().EMPTY_SPOT);
         }
 
-
-        game.getBoardObj().printTable();
 
         int score = game.getMinMaxTravelPath().getScore();
         game.activePlayer.setScore(game.activePlayer.getScore()+score);

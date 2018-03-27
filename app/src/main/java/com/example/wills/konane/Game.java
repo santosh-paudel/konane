@@ -567,29 +567,38 @@ public class Game {
 
     public void calculatePlyScores(Player currentPlayer) {
 
+        int minimizerScore = 0;
+        int maximizerScore = 0;
+
         TravelPath bestMove = getBestMove();
         if (bestMove != null) {
-            ArrayList<TravelPath> bestMoves = new ArrayList();
             int bestScore = bestMove.getMiniMaxValue();
-            //bestMoves.add(bestMove);
+            System.out.println("Best Moves: "+bestMove.toString());
 
-            System.out.println("Best move: " + bestMove + "Minimax Value: " + bestMove.getMiniMaxValue());
             for (int i = 0; i <= minimaxPly; i++) {
                 if(movesAtEachDepth.containsKey(i)) {
                     for (TravelPath moves : movesAtEachDepth.get(i)) {
                         if (moves.getMiniMaxValue() == bestScore) {
-                            System.out.println(moves + " Depth " + i + " Score " + moves.getScore());
-                            bestMoves.add(moves);
+                            if(i%2 == 0){
+                                maximizerScore+= moves.getScore();
+                            }else{
+                                minimizerScore +=moves.getScore();
+                            }
                             break;
                         }
                     }
                 }
             }
         }
+
+        if(player1.equals(currentPlayer)){
+            player1MinimaxScore = maximizerScore;
+            player2MinimaxScore = minimizerScore;
+        }else{
+            player2MinimaxScore = maximizerScore;
+            player1MinimaxScore = minimizerScore;
+        }
     }
-
-
-
 
     /**
      * This function calls Minimax algorithm and return executing time
@@ -635,7 +644,7 @@ public class Game {
             return -1;
         }
 
-        if (depth >= minimaxPly){
+        if (depth > minimaxPly){
             int heuristic = favoritePlayerScore - opponentScore;
             return heuristic;
         }
@@ -721,7 +730,7 @@ public class Game {
             return -1;
         }
 
-        if (depth >= minimaxPly){
+        if (depth > minimaxPly){
             int heuristic = favoritePlayerScore - opponentScore;
             //System.out.println("Min Heuristic "+minHeuristic);
             return heuristic;
@@ -757,6 +766,7 @@ public class Game {
         for (int i = 0; i < availableMoves.size(); i++) {
 
             TravelPath point = availableMoves.get(i);
+            tempMoves.add(point);
             //System.out.println("Point: "+point);
 
             //change this line to currentPlayer.isComputer() later
@@ -767,13 +777,13 @@ public class Game {
                 int currentScore = alphaBetaPruning(depth+1, getAlternatePlayer(currentPlayer), favoritePlayer, alpha, beta, favoritePlayerScore+point.getScore(), opponentScore);
 
                 tempAlpha = Math.max(tempAlpha, currentScore);
-
                 alpha = Math.max(alpha, tempAlpha);
+
+                point.setMiniMaxValue(currentScore);
 
 
                 if(depth == 0) {
                     //System.out.println("Depth 0 point "+point);
-                    point.setMiniMaxValue(currentScore);
                     minMaxRootValues.add(point);
                 }
 
@@ -791,6 +801,8 @@ public class Game {
                 tempBeta = Math.min(tempBeta, currentScore);
                 beta = Math.min(tempBeta, beta);
 
+                point.setMiniMaxValue(currentScore);
+
                 if(beta <= alpha)
                    break;
 
@@ -799,6 +811,13 @@ public class Game {
             board.restoreBoard(restorePointBoard);
             //System.out.println("Board Restored: ");
         }
+
+        if(movesAtEachDepth.containsKey(depth)){
+            movesAtEachDepth.get(depth).addAll(tempMoves);
+        }else{
+            movesAtEachDepth.put(depth,tempMoves);
+        }
+
 
         if(currentPlayer.equals(favoritePlayer)){
             return tempAlpha;
